@@ -3,9 +3,13 @@
 
 ## Installation
 
+## 从git下载并编译
 ```bash
 go install github.com/eternal-flame-AD/mkhosts
 ```
+## 下载release
+
+从[发布页面](https://github.com/eternal-flame-AD/mkhosts/releases/latest)下载对应平台二进制文件
 
 ## Usage
 

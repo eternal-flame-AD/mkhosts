@@ -9,9 +9,17 @@ go install github.com/eternal-flame-AD/mkhosts
 
 ## Usage
 
+mkhosts可以从每行一个的域名列表和现有的hosts文件中提取域名,也可以从cli读入域名
+
+cli指定域名:
 ```bash
 mkhosts www.pixiv.net accounts.pixiv.net app-api.pixiv.net
 ```
+读入hosts/域名文件:
+```bash
+mkhosts -f domainlists/pixiv.txt -f mycustomdomainlist.txt
+```
+
 之后将生成的结果复制到hosts文件中即可
 
 ## Notices
@@ -20,5 +28,6 @@ mkhosts仅仅提供干净的dns解析结果，不能提高链接安全性和可�
 
 ## TODO
 
+- 更多的domainlists
 - <s>自动写入hosts文件</s>
-- 读取现有hosts文件并做更新
+- <s>读取现有hosts文件并做更新</s>

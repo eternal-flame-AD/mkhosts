@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,7 +26,7 @@ const (
 )
 
 var (
-	domainNameRegex = regexp.MustCompile(`^[0-9\p{L}][0-9\p{L}-\.]{1,61}[0-9\p{L}]\.[0-9\p{L}][\p{L}-]*[0-9\p{L}]+$`)
+	domainNameRegex = regexp.MustCompile(`[0-9\p{L}][0-9\p{L}-\.]{1,61}[0-9\p{L}]\.[0-9\p{L}][\p{L}-]*[\p{L}]+`)
 	QueryRetryTimes = 3
 	POOL_MAXSIZE    = 10
 )
@@ -130,14 +132,14 @@ func testIP(ip string) *ping.Result {
 
 func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error) {
 	if !domainNameRegex.MatchString(name) {
-		return nil, errors.New(fmt.Sprintln("%s: Invalid domain name format", name))
+		return nil, errors.New(fmt.Sprintf("%s: Invalid domain name format", name))
 	}
 	resp, err := MakeDNSQuery(name, "A", verifyDNSSEC, insecure).Do()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintln("%s: %s", name, err.Error()))
+		return nil, errors.New(fmt.Sprintf("%s: %s", name, err.Error()))
 	}
 	if !insecure && verifyDNSSEC && !resp.DNSSECVerified {
-		return nil, errors.New(fmt.Sprintln("%s: DNSSEC Verify Failed", name))
+		return nil, errors.New(fmt.Sprintf("%s: DNSSEC Verify Failed", name))
 	}
 	records := make([]HostsRecord, 0)
 	for _, answer := range resp.Answer {
@@ -154,7 +156,7 @@ func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error
 		}
 	}
 	if len(records) == 0 {
-		return nil, errors.New(fmt.Sprintln("%s: No available IPs", name))
+		return nil, errors.New(fmt.Sprintf("%s: No available IPs", name))
 	}
 
 	var best int = 0
@@ -174,20 +176,55 @@ func main() {
 	  mkhosts www.pixiv.net
 	  mkhosts www.pixiv.net www.github.com -s
 	Usage:
-	  mkhosts <domains>... [-s|--dnssec][-i|--insecure][-w|--write]
+	  mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write]
 	  mkhosts -h | --help
 	Options:
 	  -s --dnssec      require DNSSEC validation
 	  -i --insecure    accept incorrect DNSSEC signatures
 	  -w --write       write hosts directly(requires priviledge)
+	  -f --file        read domains from domainlist
 	  `
 	args, _ := docopt.ParseDoc(usage)
+	errors := make([]string, 0)
+	domainfiles := args["<domainlist>"].([]string)
 	domains := args["<domains>"].([]string)
+	for _, fn := range domainfiles {
+		content, err := ioutil.ReadFile(fn)
+		contentstr := string(content)
+		if err != nil {
+			errstr := fmt.Sprintf("Error reading domainlist %s: %s\n", fn, err.Error())
+			errors = append(errors, errstr)
+			fmt.Println(errstr)
+			continue
+		}
+		var LineBreak string
+		switch {
+		case strings.Contains(contentstr, "\r\n"):
+			LineBreak = "\r\n"
+			break
+		case strings.Contains(contentstr, "\n"):
+			LineBreak = "\n"
+			break
+		case strings.Contains(contentstr, "\r"):
+			LineBreak = "\r"
+			break
+		default:
+			LineBreak = "\n"
+		}
+		contentlines := strings.Split(contentstr, LineBreak)
+		for _, line := range contentlines {
+			domain := domainNameRegex.FindString(line)
+			if len(domain) > 0 {
+				domains = append(domains, domain)
+			}
+		}
+	}
+	domains = removeRepByLoop(domains)
+
 	dnssec := args["--dnssec"] != nil && args["--dnssec"] != 0
 	insecure := args["--insecure"] != nil && args["--insecure"] != 0
 	writehosts := args["--write"] != nil && args["--write"] != 0
 	results := make([]HostsRecord, 0)
-	errors := make([]string, 0)
 
 	wp := workerpool.New(POOL_MAXSIZE)
 	resultsmutex := &sync.Mutex{}

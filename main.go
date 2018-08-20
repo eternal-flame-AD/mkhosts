@@ -103,13 +103,13 @@ type HostsRecord struct {
 	testSucessRate float64
 }
 
-func testIP(ip string, hostname string) *ping.Result {
+func testIP(ip string) *ping.Result {
 	proto, _ := ping.NewProtocol(ping.TCP.String())
 	for _, port := range []int{80, 443} {
 		target := &ping.Target{
 			Timeout:  time.Second * 2,
 			Interval: 3,
-			Host:     hostname,
+			Host:     ip,
 			Port:     port,
 			Counter:  2,
 			Protocol: proto,
@@ -142,7 +142,7 @@ func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error
 	records := make([]HostsRecord, 0)
 	for _, answer := range resp.Answer {
 		if answer.Type == 1 {
-			testresult := testIP(answer.Data, name)
+			testresult := testIP(answer.Data)
 			if testresult.SuccessCounter > 0 {
 				records = append(records, HostsRecord{
 					ip:             answer.Data,

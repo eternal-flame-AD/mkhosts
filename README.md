@@ -20,5 +20,5 @@ mkhosts仅仅提供干净的dns解析结果，不能提高链接安全性和可�
 
 ## TODO
 
-- 自动写入hosts文件
+- <s>自动写入hosts文件</s>
 - 读取现有hosts文件并做更新

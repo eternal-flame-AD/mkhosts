@@ -174,17 +174,19 @@ func main() {
 	  mkhosts www.pixiv.net
 	  mkhosts www.pixiv.net www.github.com -s
 	Usage:
-	  mkhosts <domains>... [-s|--dnssec][-i|--insecure]
+	  mkhosts <domains>... [-s|--dnssec][-i|--insecure][-w|--write]
 	  mkhosts -h | --help
 	Options:
-	  -s --dnssec   require DNSSEC validation
+	  -s --dnssec      require DNSSEC validation
 	  -i --insecure    accept incorrect DNSSEC signatures
+	  -w --write       write hosts directly(requires priviledge)
 	  `
 	args, _ := docopt.ParseDoc(usage)
 	domains := args["<domains>"].([]string)
 	dnssec := args["--dnssec"] != nil && args["--dnssec"] != 0
 	insecure := args["--insecure"] != nil && args["--insecure"] != 0
-	results := make([]string, 0)
+	writehosts := args["--write"] != nil && args["--write"] != 0
+	results := make([]HostsRecord, 0)
 	errors := make([]string, 0)
 
 	wp := workerpool.New(POOL_MAXSIZE)
@@ -200,7 +202,7 @@ func main() {
 				errors = append(errors, err.Error())
 			} else {
 				resultsmutex.Lock()
-				results = append(results, fmt.Sprintf("%s %s", hosts.ip, hosts.hostname))
+				results = append(results, *hosts)
 				resultsmutex.Unlock()
 			}
 		})
@@ -220,7 +222,13 @@ func main() {
 
 	fmt.Println("\n\n\n===============Results==============")
 	for _, resultline := range results {
-		fmt.Println(resultline)
+		fmt.Println(fmt.Sprintf("%s %s", resultline.ip, resultline.hostname))
+	}
+	if writehosts {
+		err := addHosts(results)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 	}
 
 }

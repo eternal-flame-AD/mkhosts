@@ -27,7 +27,7 @@ const (
 
 var (
 	domainNameRegex = regexp.MustCompile(`[0-9\p{L}][0-9\p{L}-\.]{1,61}[0-9\p{L}]\.[0-9\p{L}][\p{L}-]*[\p{L}]+`)
-	QueryRetryTimes = 3
+	QueryRetryTimes = 5
 	POOL_MAXSIZE    = 10
 )
 
@@ -145,7 +145,7 @@ func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error
 	for _, answer := range resp.Answer {
 		if answer.Type == 1 {
 			testresult := testIP(answer.Data)
-			if testresult.SuccessCounter > 0 {
+			if testresult != nil && testresult.SuccessCounter > 0 {
 				records = append(records, HostsRecord{
 					ip:             answer.Data,
 					hostname:       name,

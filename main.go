@@ -132,14 +132,14 @@ func testIP(ip string) *ping.Result {
 
 func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error) {
 	if !domainNameRegex.MatchString(name) {
-		return nil, errors.New(fmt.Sprintf("%s: Invalid domain name format", name))
+		return nil, fmt.Errorf("%s: Invalid domain name format", name)
 	}
 	resp, err := MakeDNSQuery(name, "A", verifyDNSSEC, insecure).Do()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("%s: %s", name, err.Error()))
+		return nil, fmt.Errorf("%s: %s", name, err.Error())
 	}
 	if !insecure && verifyDNSSEC && !resp.DNSSECVerified {
-		return nil, errors.New(fmt.Sprintf("%s: DNSSEC Verify Failed", name))
+		return nil, fmt.Errorf("%s: DNSSEC Verify Failed", name)
 	}
 	records := make([]HostsRecord, 0)
 	for _, answer := range resp.Answer {
@@ -156,7 +156,7 @@ func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error
 		}
 	}
 	if len(records) == 0 {
-		return nil, errors.New(fmt.Sprintf("%s: No available IPs", name))
+		return nil, fmt.Errorf("%s: No available IPs", name)
 	}
 
 	var best int = 0
@@ -185,7 +185,7 @@ func main() {
 	  -f --file        read domains from domainlist
 	  `
 	args, _ := docopt.ParseDoc(usage)
-	errors := make([]string, 0)
+	errorlist := make([]string, 0)
 	domainfiles := args["<domainlist>"].([]string)
 	domains := args["<domains>"].([]string)
 	for _, fn := range domainfiles {
@@ -193,7 +193,7 @@ func main() {
 		contentstr := string(content)
 		if err != nil {
 			errstr := fmt.Sprintf("Error reading domainlist %s: %s\n", fn, err.Error())
-			errors = append(errors, errstr)
+			errorlist = append(errorlist, errstr)
 			fmt.Println(errstr)
 			continue
 		}
@@ -220,6 +220,9 @@ func main() {
 		}
 	}
 	domains = removeRepByLoop(domains)
+	if len(domains) == 0 {
+		docopt.PrintHelpAndExit(errors.New("No hostname specified"), usage)
+	}
 
 	dnssec := args["--dnssec"] != nil && args["--dnssec"] != 0
 	insecure := args["--insecure"] != nil && args["--insecure"] != 0
@@ -236,7 +239,7 @@ func main() {
 			hosts, err := mkhosts(thisdomain, dnssec, insecure)
 			if err != nil {
 				fmt.Println(err.Error())
-				errors = append(errors, err.Error())
+				errorlist = append(errorlist, err.Error())
 			} else {
 				resultsmutex.Lock()
 				results = append(results, *hosts)
@@ -250,21 +253,22 @@ func main() {
 	}
 	wp.StopWait()
 
-	if len(errors) != 0 {
+	if len(errorlist) != 0 {
 		fmt.Println("\n\n\n=========Collected Errors===========")
-		for _, errorline := range errors {
+		for _, errorline := range errorlist {
 			fmt.Println(errorline)
 		}
 	}
-
-	fmt.Println("\n\n\n===============Results==============")
-	for _, resultline := range results {
-		fmt.Println(fmt.Sprintf("%s %s", resultline.ip, resultline.hostname))
-	}
-	if writehosts {
-		err := addHosts(results)
-		if err != nil {
-			fmt.Println(err.Error())
+	if len(results) != 0 {
+		fmt.Println("\n\n\n===============Results==============")
+		for _, resultline := range results {
+			fmt.Println(fmt.Sprintf("%s %s", resultline.ip, resultline.hostname))
+		}
+		if writehosts {
+			err := addHosts(results)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 		}
 	}
 

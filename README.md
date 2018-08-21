@@ -15,6 +15,18 @@ go install github.com/eternal-flame-AD/mkhosts
 
 mkhosts可以从每行一个的域名列表和现有的hosts文件中提取域名,也可以从cli读入域名
 
+```
+Usage:
+          mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write]
+          mkhosts -h | --help
+        Options:
+          -s --dnssec      require DNSSEC validation
+          -i --insecure    accept incorrect DNSSEC signatures
+          -w --write       write hosts directly(requires priviledge)
+          -f --file        read domains from domainlist
+          -q --quiet       ignore infos and errors, output hosts directly to stdout
+```
+
 cli指定域名:
 ```bash
 mkhosts www.pixiv.net accounts.pixiv.net app-api.pixiv.net

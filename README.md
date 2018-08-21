@@ -23,8 +23,14 @@ mkhosts www.pixiv.net accounts.pixiv.net app-api.pixiv.net
 ```bash
 mkhosts -f domainlists/pixiv.txt -f mycustomdomainlist.txt
 ```
-
-之后将生成的结果复制到hosts文件中即可
+静默执行，直接将结果追加到hosts:
+```bash
+sudo mkhosts -f domainlists/pixiv.txt -q >> /etc/hosts
+```
+将结果写入hosts（自动替换重复域名）:
+```bash
+sudo mkhosts -f domainlists/pixiv.txt -w
+```
 
 ## Notices
 

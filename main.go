@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloverstd/tcping/ping"
 	"github.com/docopt/docopt-go"
+	"github.com/eternal-flame-AD/tcping/ping"
 	"github.com/gammazero/workerpool"
 
 	"github.com/ddliu/go-httpclient"
@@ -105,7 +105,7 @@ type HostsRecord struct {
 	testSucessRate float64
 }
 
-func testIP(ip string) *ping.Result {
+func testIP(ip string, quiet bool) *ping.Result {
 	proto, _ := ping.NewProtocol(ping.TCP.String())
 	for _, port := range []int{80, 443} {
 		target := &ping.Target{
@@ -118,7 +118,7 @@ func testIP(ip string) *ping.Result {
 		}
 		pinger := ping.NewTCPing()
 		pinger.SetTarget(target)
-		pingerDone := pinger.Start()
+		pingerDone := pinger.Start(quiet)
 		select {
 		case <-pingerDone:
 			break
@@ -130,7 +130,7 @@ func testIP(ip string) *ping.Result {
 	return nil
 }
 
-func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error) {
+func mkhosts(name string, verifyDNSSEC bool, insecure bool, quiet bool) (*HostsRecord, error) {
 	if !domainNameRegex.MatchString(name) {
 		return nil, fmt.Errorf("%s: Invalid domain name format", name)
 	}
@@ -144,7 +144,7 @@ func mkhosts(name string, verifyDNSSEC bool, insecure bool) (*HostsRecord, error
 	records := make([]HostsRecord, 0)
 	for _, answer := range resp.Answer {
 		if answer.Type == 1 {
-			testresult := testIP(answer.Data)
+			testresult := testIP(answer.Data, quiet)
 			if testresult != nil && testresult.SuccessCounter > 0 {
 				records = append(records, HostsRecord{
 					ip:             answer.Data,
@@ -175,14 +175,16 @@ func main() {
 	Example:
 	  mkhosts www.pixiv.net
 	  mkhosts www.pixiv.net www.github.com -s
+	  mkhosts -f domainlists/pixiv.net -q >hosts
 	Usage:
-	  mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write]
+	  mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet]
 	  mkhosts -h | --help
 	Options:
 	  -s --dnssec      require DNSSEC validation
 	  -i --insecure    accept incorrect DNSSEC signatures
 	  -w --write       write hosts directly(requires priviledge)
 	  -f --file        read domains from domainlist
+	  -q --quiet       ignore infos and errors, output hosts directly to stdout
 	  `
 	args, _ := docopt.ParseDoc(usage)
 	errorlist := make([]string, 0)
@@ -227,6 +229,7 @@ func main() {
 	dnssec := args["--dnssec"] != nil && args["--dnssec"] != 0
 	insecure := args["--insecure"] != nil && args["--insecure"] != 0
 	writehosts := args["--write"] != nil && args["--write"] != 0
+	quiet := args["--quiet"] != nil && args["--quiet"] != 0
 	results := make([]HostsRecord, 0)
 
 	wp := workerpool.New(POOL_MAXSIZE)
@@ -236,7 +239,7 @@ func main() {
 		wp.Submit(func() {
 			thisdomain := domain
 			gotdomain <- true
-			hosts, err := mkhosts(thisdomain, dnssec, insecure)
+			hosts, err := mkhosts(thisdomain, dnssec, insecure, quiet)
 			if err != nil {
 				fmt.Println(err.Error())
 				errorlist = append(errorlist, err.Error())
@@ -253,14 +256,16 @@ func main() {
 	}
 	wp.StopWait()
 
-	if len(errorlist) != 0 {
+	if !quiet && len(errorlist) != 0 {
 		fmt.Println("\n\n\n=========Collected Errors===========")
 		for _, errorline := range errorlist {
 			fmt.Println(errorline)
 		}
 	}
 	if len(results) != 0 {
-		fmt.Println("\n\n\n===============Results==============")
+		if !quiet {
+			fmt.Println("\n\n\n===============Results==============")
+		}
 		for _, resultline := range results {
 			fmt.Println(fmt.Sprintf("%s %s", resultline.ip, resultline.hostname))
 		}

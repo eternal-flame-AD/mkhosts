@@ -45,21 +45,7 @@ func addHosts(records []HostsRecord) error {
 		return err
 	}
 	originalhosts := string(b)
-	var LineBreak string
-	switch {
-	case strings.Contains(originalhosts, "\r\n"):
-		LineBreak = "\r\n"
-		break
-	case strings.Contains(originalhosts, "\n"):
-		LineBreak = "\n"
-		break
-	case strings.Contains(originalhosts, "\r"):
-		LineBreak = "\r"
-		break
-	default:
-		LineBreak = "\n"
-		break
-	}
+	LineBreak := detectLineBreakFromString(originalhosts)
 	for _, record := range records {
 		substituionexp := regexp.MustCompile(fmt.Sprintf(`[a-fA-F\d\.\:]+\s+%s(.*)`, strings.Replace(record.hostname, ".", "\\.", -1)))
 		if occurences := substituionexp.FindAllString(originalhosts, -1); len(occurences) != 0 {

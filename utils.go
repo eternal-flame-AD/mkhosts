@@ -1,5 +1,10 @@
 package main
 
+import (
+	"runtime"
+	"strings"
+)
+
 func removeRepByLoop(slc []string) []string {
 	result := []string{}
 	for i := range slc {
@@ -15,4 +20,29 @@ func removeRepByLoop(slc []string) []string {
 		}
 	}
 	return result
+}
+
+func detectLineBreakFromString(s string) string {
+	var LineBreak string
+	switch {
+	case strings.Contains(s, "\r\n"):
+		LineBreak = "\r\n"
+		break
+	case strings.Contains(s, "\n"):
+		LineBreak = "\n"
+		break
+	case strings.Contains(s, "\r"):
+		LineBreak = "\r"
+		break
+	default:
+		switch runtime.GOOS {
+		case "windows":
+			LineBreak = "\r\n"
+		case "darwin":
+			LineBreak = "\r"
+		default:
+			LineBreak = "\n"
+		}
+	}
+	return LineBreak
 }

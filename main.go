@@ -199,20 +199,7 @@ func main() {
 			fmt.Println(errstr)
 			continue
 		}
-		var LineBreak string
-		switch {
-		case strings.Contains(contentstr, "\r\n"):
-			LineBreak = "\r\n"
-			break
-		case strings.Contains(contentstr, "\n"):
-			LineBreak = "\n"
-			break
-		case strings.Contains(contentstr, "\r"):
-			LineBreak = "\r"
-			break
-		default:
-			LineBreak = "\n"
-		}
+		LineBreak := detectLineBreakFromString(contentstr)
 		contentlines := strings.Split(contentstr, LineBreak)
 		for _, line := range contentlines {
 			domain := domainNameRegex.FindString(line)

@@ -1,4 +1,4 @@
-# mkhosts
+# mkhosts [![Build Status](https://travis-ci.org/eternal-flame-AD/mkhosts.svg?branch=master)](https://travis-ci.org/eternal-flame-AD/mkhosts)
 一个自动生成hosts文件绕过dns污染的工具，采用DNSoverHTTPS绕过国内DNS,适用于P站等未遭到全面TCP/IP封禁的网站，自动测试tcp链接可靠性，解决各ISP情况不同有的别人能用的hosts自己却用不了的问题
 
 ## Installation

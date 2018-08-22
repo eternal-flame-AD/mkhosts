@@ -130,11 +130,11 @@ func testIP(ip string, quiet bool) *ping.Result {
 	return nil
 }
 
-func mkhosts(name string, verifyDNSSEC bool, insecure bool, quiet bool) (*HostsRecord, error) {
+func mkhosts(name string, verifyDNSSEC bool, insecure bool, quiet bool, endpoint string) (*HostsRecord, error) {
 	if !domainNameRegex.MatchString(name) {
 		return nil, fmt.Errorf("%s: Invalid domain name format", name)
 	}
-	resp, err := MakeDNSQuery(name, "A", verifyDNSSEC, insecure).Do()
+	resp, err := MakeDNSQueryWithCustomEndpoint(name, "A", verifyDNSSEC, insecure, endpoint).Do()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", name, err.Error())
 	}
@@ -177,14 +177,15 @@ func main() {
 	  mkhosts www.pixiv.net www.github.com -s
 	  mkhosts -f domainlists/pixiv.net -q >hosts
 	Usage:
-	  mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet]
+	  mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet][-e <endpoint>|--endpoint <endpoint>]
 	  mkhosts -h | --help
 	Options:
-	  -s --dnssec      require DNSSEC validation
-	  -i --insecure    accept incorrect DNSSEC signatures
-	  -w --write       write hosts directly(requires priviledge)
-	  -f --file        read domains from domainlist
-	  -q --quiet       ignore infos and errors, output hosts directly to stdout
+	  -s --dnssec                  require DNSSEC validation
+	  -i --insecure                accept incorrect DNSSEC signatures
+	  -w --write                   write hosts directly(requires priviledge)
+	  -f --file                    read domains from domainlist
+	  -q --quiet                   ignore infos and errors, output hosts directly to stdout
+	  -e, --endpoint <endpoint>    custom endpoint. default: https://1.1.1.1/dns-query
 	  `
 	args, _ := docopt.ParseDoc(usage)
 	errorlist := make([]string, 0)
@@ -217,6 +218,7 @@ func main() {
 	insecure := args["--insecure"] != nil && args["--insecure"] != 0
 	writehosts := args["--write"] != nil && args["--write"] != 0
 	quiet := args["--quiet"] != nil && args["--quiet"] != 0
+	endpoint := append(args["--endpoint"].([]string), CloudFlareURL)[0] // CloudFlareURL if empty
 	results := make([]HostsRecord, 0)
 
 	wp := workerpool.New(POOL_MAXSIZE)
@@ -226,7 +228,7 @@ func main() {
 		wp.Submit(func() {
 			thisdomain := domain
 			gotdomain <- true
-			hosts, err := mkhosts(thisdomain, dnssec, insecure, quiet)
+			hosts, err := mkhosts(thisdomain, dnssec, insecure, quiet, endpoint)
 			if err != nil {
 				fmt.Println(err.Error())
 				errorlist = append(errorlist, err.Error())

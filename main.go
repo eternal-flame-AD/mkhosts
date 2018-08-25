@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -186,20 +187,34 @@ func main() {
 	  -f --file                    read domains from domainlist
 	  -q --quiet                   ignore infos and errors, output hosts directly to stdout
 	  -e, --endpoint <endpoint>    custom endpoint. default: https://1.1.1.1/dns-query
-	  `
+	
+	Internal domain lists:
+`
+	for _, val := range reflect.ValueOf(InternalDomainLists).MapKeys() {
+		key := val.String()
+		usage += "\t\t" + key + "\n"
+
+	}
 	args, _ := docopt.ParseDoc(usage)
 	errorlist := make([]string, 0)
 	domainfiles := args["<domainlist>"].([]string)
 	domains := args["<domains>"].([]string)
 	for _, fn := range domainfiles {
-		content, err := ioutil.ReadFile(fn)
-		contentstr := string(content)
-		if err != nil {
-			errstr := fmt.Sprintf("Error reading domainlist %s: %s\n", fn, err.Error())
-			errorlist = append(errorlist, errstr)
-			fmt.Println(errstr)
-			continue
+		var contentstr string
+		content, ok := InternalDomainLists[fn]
+		if ok {
+			contentstr = content
+		} else {
+			content, err := ioutil.ReadFile(fn)
+			contentstr = string(content)
+			if err != nil {
+				errstr := fmt.Sprintf("Error reading domainlist %s: %s\n", fn, err.Error())
+				errorlist = append(errorlist, errstr)
+				fmt.Println(errstr)
+				continue
+			}
 		}
+
 		LineBreak := detectLineBreakFromString(contentstr)
 		contentlines := strings.Split(contentstr, LineBreak)
 		for _, line := range contentlines {

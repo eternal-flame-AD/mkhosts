@@ -16,7 +16,13 @@ go install github.com/eternal-flame-AD/mkhosts
 mkhosts可以从每行一个的域名列表和现有的hosts文件中提取域名,也可以从cli读入域名
 
 ```
-Usage:
+mkhosts <domains> [options]
+        Query words meanings via the command line.
+        Example:
+          mkhosts www.pixiv.net
+          mkhosts www.pixiv.net www.github.com -s
+          mkhosts -f pixiv -q >hosts
+        Usage:
           mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet][-e <endpoint>|--endpoint <endpoint>]
           mkhosts -h | --help
         Options:
@@ -26,15 +32,19 @@ Usage:
           -f --file                    read domains from domainlist
           -q --quiet                   ignore infos and errors, output hosts directly to stdout
           -e, --endpoint <endpoint>    custom endpoint. default: https://1.1.1.1/dns-query
+
+        Internal domain lists:
+                arukas
+                pixiv
 ```
 
 cli指定域名:
 ```bash
 mkhosts www.pixiv.net accounts.pixiv.net app-api.pixiv.net
 ```
-读入hosts/域名文件:
+读入hosts/域名文件/内置域名列表(目前有pixiv和arukas两个):
 ```bash
-mkhosts -f domainlists/pixiv.txt -f mycustomdomainlist.txt
+mkhosts -f pixiv -f mycustomdomainlist.txt
 ```
 静默执行，直接将结果追加到hosts:
 ```bash

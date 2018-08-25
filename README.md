@@ -5,7 +5,7 @@
 
 ## 从git下载并编译
 ```bash
-go install github.com/eternal-flame-AD/mkhosts
+go get -u github.com/eternal-flame-AD/mkhosts
 ```
 ## 下载release
 

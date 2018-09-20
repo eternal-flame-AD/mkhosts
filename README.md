@@ -21,9 +21,9 @@ mkhosts <domains> [options]
         Example:
           mkhosts www.pixiv.net
           mkhosts www.pixiv.net www.github.com -s
-          mkhosts -f pixiv -q >hosts
+          mkhosts -f domainlists/pixiv.net -q >hosts
         Usage:
-          mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet][-e <endpoint>|--endpoint <endpoint>]
+          mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-m <mode>|--mode <mode>][-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet][-e <endpoint>|--endpoint <endpoint>]
           mkhosts -h | --help
         Options:
           -s --dnssec                  require DNSSEC validation
@@ -32,10 +32,15 @@ mkhosts <domains> [options]
           -f --file                    read domains from domainlist
           -q --quiet                   ignore infos and errors, output hosts directly to stdout
           -e, --endpoint <endpoint>    custom endpoint. default: https://1.1.1.1/dns-query
+          -m, --mode <mode>            test mode. default: tcping
 
         Internal domain lists:
-                arukas
                 pixiv
+                arukas
+
+        Test modes:
+                tcping
+                ssl
 ```
 
 cli指定域名:
@@ -48,11 +53,15 @@ mkhosts -f pixiv -f mycustomdomainlist.txt
 ```
 静默执行，直接将结果追加到hosts:
 ```bash
-sudo mkhosts -f domainlists/pixiv.txt -q >> /etc/hosts
+sudo mkhosts -f pixiv -q >> /etc/hosts
 ```
 将结果写入hosts（自动替换重复域名）:
 ```bash
-sudo mkhosts -f domainlists/pixiv.txt -w
+sudo mkhosts -f pixiv -w
+```
+测试ssl握手：
+```bash
+mkhosts -f pixiv -m ssl
 ```
 
 ## Notices

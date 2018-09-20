@@ -10,10 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/docopt/docopt-go"
-	"github.com/eternal-flame-AD/tcping/ping"
 	"github.com/gammazero/workerpool"
 
 	"github.com/ddliu/go-httpclient"
@@ -100,38 +98,12 @@ type DNSAnswer struct {
 	Data string `json:"data"`
 }
 type HostsRecord struct {
-	ip             string
-	hostname       string
-	avgDuration    float64
-	testSucessRate float64
+	ip         string
+	hostname   string
+	testResult TestResult
 }
 
-func testIP(ip string, quiet bool) *ping.Result {
-	proto, _ := ping.NewProtocol(ping.TCP.String())
-	for _, port := range []int{80, 443} {
-		target := &ping.Target{
-			Timeout:  time.Second * 2,
-			Interval: 3,
-			Host:     ip,
-			Port:     port,
-			Counter:  2,
-			Protocol: proto,
-		}
-		pinger := ping.NewTCPing()
-		pinger.SetTarget(target)
-		pingerDone := pinger.Start(quiet)
-		select {
-		case <-pingerDone:
-			break
-		}
-		if pinger.Result().SuccessCounter > 0 {
-			return pinger.Result()
-		}
-	}
-	return nil
-}
-
-func mkhosts(name string, verifyDNSSEC bool, insecure bool, quiet bool, endpoint string) (*HostsRecord, error) {
+func mkhosts(name string, verifyDNSSEC bool, insecure bool, quiet bool, endpoint string, testmethod Tester) (*HostsRecord, error) {
 	if !domainNameRegex.MatchString(name) {
 		return nil, fmt.Errorf("%s: Invalid domain name format", name)
 	}
@@ -142,16 +114,16 @@ func mkhosts(name string, verifyDNSSEC bool, insecure bool, quiet bool, endpoint
 	if !insecure && verifyDNSSEC && !resp.DNSSECVerified {
 		return nil, fmt.Errorf("%s: DNSSEC Verify Failed", name)
 	}
+
 	records := make([]HostsRecord, 0)
 	for _, answer := range resp.Answer {
 		if answer.Type == 1 {
-			testresult := testIP(answer.Data, quiet)
-			if testresult != nil && testresult.SuccessCounter > 0 {
+			testresult := testmethod.TestIP(answer.Data, name, quiet)
+			if testresult.success {
 				records = append(records, HostsRecord{
-					ip:             answer.Data,
-					hostname:       name,
-					testSucessRate: float64(testresult.SuccessCounter) / float64(testresult.Counter),
-					avgDuration:    testresult.Avg().Seconds() * 1000,
+					ip:         answer.Data,
+					hostname:   name,
+					testResult: testresult,
 				})
 			}
 		}
@@ -162,12 +134,33 @@ func mkhosts(name string, verifyDNSSEC bool, insecure bool, quiet bool, endpoint
 
 	var best int = 0
 	for index, record := range records {
-		if record.testSucessRate > records[best].testSucessRate || record.testSucessRate == records[best].testSucessRate && record.avgDuration < records[best].avgDuration {
+		if record.testResult.successRate > records[best].testResult.successRate || record.testResult.successRate == records[best].testResult.successRate && record.testResult.delay < records[best].testResult.delay {
 			best = index
 		}
 	}
 
 	return &records[best], nil
+}
+
+func determineModeFromArgs(arg interface{}) (string, error) {
+	modeIsAvailable := func(mode string) bool {
+		_, ok := AvailableTesters[mode]
+		return ok
+	}
+	mode := "tcping"
+	if res, ok := arg.(string); ok {
+		mode = res
+	}
+	if res, ok := arg.([]string); ok {
+		if len(res) != 0 {
+			mode = res[0]
+		}
+	}
+	if modeIsAvailable(mode) {
+		return mode, nil
+	} else {
+		return "", errors.New("Mode not found.")
+	}
 }
 
 func main() {
@@ -178,7 +171,7 @@ func main() {
 	  mkhosts www.pixiv.net www.github.com -s
 	  mkhosts -f domainlists/pixiv.net -q >hosts
 	Usage:
-	  mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet][-e <endpoint>|--endpoint <endpoint>]
+	  mkhosts [<domains>|-f <domainlist>|--file <domainlist>]... [-m <mode>|--mode <mode>][-s|--dnssec][-i|--insecure][-w|--write][-q|--quiet][-e <endpoint>|--endpoint <endpoint>]
 	  mkhosts -h | --help
 	Options:
 	  -s --dnssec                  require DNSSEC validation
@@ -187,18 +180,28 @@ func main() {
 	  -f --file                    read domains from domainlist
 	  -q --quiet                   ignore infos and errors, output hosts directly to stdout
 	  -e, --endpoint <endpoint>    custom endpoint. default: https://1.1.1.1/dns-query
+	  -m, --mode <mode>            test mode. default: tcping
 	
 	Internal domain lists:
 `
 	for _, val := range reflect.ValueOf(InternalDomainLists).MapKeys() {
 		key := val.String()
 		usage += "\t\t" + key + "\n"
-
 	}
+	usage += "\n\tTest modes:\n"
+
+	for _, val := range reflect.ValueOf(AvailableTesters).MapKeys() {
+		key := val.String()
+		usage += "\t\t" + key + "\n"
+	}
+
 	args, _ := docopt.ParseDoc(usage)
 	errorlist := make([]string, 0)
-	domainfiles := args["<domainlist>"].([]string)
-	domains := args["<domains>"].([]string)
+
+	domainfiles := StringSliceOrEmpty(args["<domainlist>"])
+
+	domains := StringSliceOrEmpty(args["<domains>"])
+
 	for _, fn := range domainfiles {
 		var contentstr string
 		content, ok := InternalDomainLists[fn]
@@ -233,17 +236,23 @@ func main() {
 	insecure := args["--insecure"] != nil && args["--insecure"] != 0
 	writehosts := args["--write"] != nil && args["--write"] != 0
 	quiet := args["--quiet"] != nil && args["--quiet"] != 0
-	endpoint := append(args["--endpoint"].([]string), CloudFlareURL)[0] // CloudFlareURL if empty
+	endpoint := append(StringSliceOrEmpty(args["--endpoint"]), CloudFlareURL)[0] // CloudFlareURL if empty
+	testmode, err := determineModeFromArgs(args["--mode"])
+	if err != nil {
+		docopt.PrintHelpAndExit(err, usage)
+	}
 	results := make([]HostsRecord, 0)
 
 	wp := workerpool.New(POOL_MAXSIZE)
 	resultsmutex := &sync.Mutex{}
 	for _, domain := range domains {
 		gotdomain := make(chan bool)
+		tester := AvailableTesters[testmode]
 		wp.Submit(func() {
 			thisdomain := domain
+			thistester := tester
 			gotdomain <- true
-			hosts, err := mkhosts(thisdomain, dnssec, insecure, quiet, endpoint)
+			hosts, err := mkhosts(thisdomain, dnssec, insecure, quiet, endpoint, thistester)
 			if err != nil {
 				fmt.Println(err.Error())
 				errorlist = append(errorlist, err.Error())

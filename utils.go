@@ -46,3 +46,10 @@ func detectLineBreakFromString(s string) string {
 	}
 	return LineBreak
 }
+
+func StringSliceOrEmpty(s interface{}) []string {
+	if res, ok := s.([]string); ok {
+		return res
+	}
+	return []string{}
+}

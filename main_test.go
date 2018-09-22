@@ -88,15 +88,30 @@ func TestDNSSECFailedInsecure(t *testing.T) {
 	}
 }
 
-func TestIPTest(t *testing.T) {
-	res := testIP("1.1.1.1", true)
-	if res == nil {
-		t.Error("TestIPTest: result is nil")
+func TestTCPing(t *testing.T) {
+	tester := TCPingTester{}
+	res := tester.TestIP("1.1.1.1", "test", true)
+	if !res.success {
+		t.Error("TestTCPing: failure")
 		t.FailNow()
 	}
-	res = testIP("224.0.0.1", true) // unreachable
-	if res != nil {
-		t.Error("TestIPTest: sucess")
+	res = tester.TestIP("224.0.0.1", "test", true) // unreachable
+	if res.success {
+		t.Error("TestTCPing: sucess")
+		t.FailNow()
+	}
+}
+
+func TestSSL(t *testing.T) {
+	tester := SSLTester{}
+	res := tester.TestIP("1.1.1.1", "www.cloudflare.com", true)
+	if !res.success {
+		t.Error("TestSSLHandshake: failure")
+		t.FailNow()
+	}
+	res = tester.TestIP("224.0.0.1", "test", true) // unreachable
+	if res.success {
+		t.Error("TestSSLHandshake: sucess")
 		t.FailNow()
 	}
 }
